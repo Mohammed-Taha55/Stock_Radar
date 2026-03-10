@@ -62,8 +62,15 @@ export default function App() {
                 <main className="flex-1">
                     <Dashboard refreshKey={refreshKey} onLoadComplete={handleLoadComplete} />
                 </main>
-                <footer className="relative z-10 py-4 text-center border-t" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-                    <p className="text-[11px]">Stock Radar · Reddit sentiment · Prices via Finnhub</p>
+                <footer className="relative z-10 py-5 px-6 border-t" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+                    <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className="text-[11px] order-2 sm:order-1 opacity-70">
+                            Stock Radar &bull; Reddit sentiment &bull; Prices via Finnhub
+                        </p>
+                        <p className="text-[11px] order-1 sm:order-2 font-medium tracking-wide">
+                            Designed by <span style={{ color: 'var(--accent)' }}>Taha~</span> ✨
+                        </p>
+                    </div>
                 </footer>
             </div>
         </>
