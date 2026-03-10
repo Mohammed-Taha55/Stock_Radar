@@ -56,14 +56,22 @@ router.get('/:ticker/history', async (req: Request, res: Response) => {
     }
 });
 
-// ─── POST /api/ingest ─────────────────────────────────────────────────────────
-// Manually trigger a full ingestion run.
-router.post('/ingest', async (_req: Request, res: Response) => {
+// ─── GET/POST /api/ingest ─────────────────────────────────────────────────────
+// Manually trigger a full ingestion run (or via Vercel Cron Job).
+router.all('/ingest', async (req: Request, res: Response) => {
+    // Vercel Cron Security (Optional but recommended)
+    if (process.env.VERCEL && process.env.CRON_SECRET) {
+        if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+            res.status(401).json({ success: false, error: 'Unauthorized cron request' });
+            return;
+        }
+    }
+
     try {
         const count = await runIngestion();
         res.json({ success: true, message: `Ingestion complete`, count });
     } catch (err) {
-        console.error('[API] POST /ingest error:', err);
+        console.error('[API] /ingest error:', err);
         res.status(500).json({ success: false, error: 'Ingestion failed' });
     }
 });

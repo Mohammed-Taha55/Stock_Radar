@@ -3,14 +3,33 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
-
-dotenv.config();
-
 import snapshotRoutes from './routes/snapshots';
 import { runIngestion } from './jobs/ingestJob';
 
+dotenv.config();
+
 const app = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
+
+// ─── Serverless DB Connection ──────────────────────────────────────────────────
+let isConnected = false;
+async function connectDB() {
+    if (isConnected) return;
+    const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/stock_radar';
+    try {
+        await mongoose.connect(uri);
+        isConnected = true;
+        console.log(`[DB] Connected to MongoDB`);
+    } catch (err) {
+        console.error('[DB] Connection failed:', err);
+    }
+}
+
+// Connect to DB before handling any request (Serverless pattern)
+app.use(async (_req, _res, next) => {
+    await connectDB();
+    next();
+});
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({ origin: '*' }));
@@ -24,19 +43,7 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ─── MongoDB Connection ────────────────────────────────────────────────────────
-async function connectDB(): Promise<void> {
-    const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/stock_radar';
-    try {
-        await mongoose.connect(uri);
-        console.log(`[DB] Connected to MongoDB: ${uri}`);
-    } catch (err) {
-        console.error('[DB] Connection failed:', err);
-        process.exit(1);
-    }
-}
-
-// ─── Cron Job ─────────────────────────────────────────────────────────────────
+// ─── Cron Job (For Local / Render Only) ───────────────────────────────────────
 function startCronJob(): void {
     const schedule = process.env.CRON_SCHEDULE || '*/15 * * * *';
     cron.schedule(schedule, async () => {
@@ -50,19 +57,16 @@ function startCronJob(): void {
     console.log(`[Cron] Scheduled ingestion: "${schedule}"`);
 }
 
-// ─── Bootstrap ────────────────────────────────────────────────────────────────
-async function bootstrap(): Promise<void> {
-    await connectDB();
-    startCronJob();
-
-    app.listen(PORT, () => {
-        console.log(`\n🚀 Stock Radar API running at http://localhost:${PORT}`);
-        console.log(`   Health:    http://localhost:${PORT}/api/health`);
-        console.log(`   Snapshots: http://localhost:${PORT}/api/snapshots`);
-        console.log(`   Ingest:    POST http://localhost:${PORT}/api/snapshots/ingest`);
-        console.log('\n   Run initial ingestion with:');
-        console.log(`   curl -X POST http://localhost:${PORT}/api/snapshots/ingest\n`);
+// ─── Bootstrap (Local / Render) ───────────────────────────────────────────────
+// Vercel sets VERCEL=1, so we only listen and start cron if NOT on Vercel
+if (!process.env.VERCEL) {
+    connectDB().then(() => {
+        startCronJob();
+        app.listen(PORT, () => {
+            console.log(`\n🚀 Stock Radar API running at http://localhost:${PORT}`);
+        });
     });
 }
 
-bootstrap().catch(console.error);
+// Required for Vercel Serverless Functions
+export default app;
